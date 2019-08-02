@@ -86,7 +86,6 @@ jobs:
           gcloud auth activate-service-account --project=$GCP_PROJECT --key-file=service.key
 
           #bigquery query
-          
           #drop all rows
           cat gcs-export-pipelines/tasks/delete.rows.sql | bq query --use_legacy_sql=False --project=$GCP_PROJECT
 
@@ -111,6 +110,8 @@ jobs:
       params:
         GCP_KEY: ((GCP_KEY))
         GCP_PROJECT: ((GCP_PROJECT))
+        BIGQUERY_TABLE: ((BIGQUERY_TABLE))
+        GCS_BUCKET: ((GCS_BUCKET))
       run:
         path: bash
         args:
@@ -122,3 +123,14 @@ jobs:
           gcloud auth activate-service-account --project=$GCP_PROJECT --key-file=service.key
 
           #bigquery query
+          bq load \
+          --source_format=NEWLINE_DELIMITED_JSON \
+          --autodetect \
+          --replace=true \
+          --max_bad_records=100 \
+          $BIGQUERY_TABLE \
+          gs://$GCS_BUCKET/nd_skus.json 
+
+          #count current rows
+          cat gcs-export-pipelines/tasks/count.sql | bq query --use_legacy_sql=False --project=$GCP_PROJECT
+
