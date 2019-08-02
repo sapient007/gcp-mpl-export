@@ -38,6 +38,7 @@ jobs:
   plan:
   - aggregate:
     - get: midnight-hour
+      trigger: true
     - get: cf-mgmt-image
     - get: gcs-export-pipelines
   - task: download-gcp-price-json
