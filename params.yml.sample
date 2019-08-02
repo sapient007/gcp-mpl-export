@@ -1,0 +1,8 @@
+#url for gcp prices
+SKUS_URL: <skus location>
+
+#GCS information
+GCP_PROJECT: <GCP Project Name>
+GCS_BUCKET: <GCS storage bucket>
+GCP_KEY: <GCP Service Account Key> 
+BIGQUERY_TABLE: <BigQuery Table>
