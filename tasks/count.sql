@@ -1,1 +1,1 @@
-select count(*) from gcp_mpl.all_products
+select count(*) from $BIGQUERY_TABLE

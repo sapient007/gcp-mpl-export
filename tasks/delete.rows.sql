@@ -1,1 +1,1 @@
-delete from gcp_mpl.all_products where true
+delete from $BIGQUERY_TABLE where true

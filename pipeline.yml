@@ -38,7 +38,6 @@ jobs:
   plan:
   - aggregate:
     - get: midnight-hour
-      trigger: true
     - get: cf-mgmt-image
     - get: gcs-export-pipelines
   - task: download-gcp-price-json
@@ -83,6 +82,7 @@ jobs:
       params:
         GCP_KEY: ((GCP_KEY))
         GCP_PROJECT: ((GCP_PROJECT))
+        BIGQUERY_TABLE: ((BIGQUERY_TABLE))
       run:
         path: bash
         args:
@@ -95,10 +95,10 @@ jobs:
 
           #bigquery query
           #drop all rows
-          cat gcs-export-pipelines/tasks/delete.rows.sql | bq query --use_legacy_sql=False --project=$GCP_PROJECT
+          eval "echo \"$(cat gcs-export-pipelines/tasks/delete.rows.sql)\"" | bq query --use_legacy_sql=False --project=$GCP_PROJECT
 
            #count current rows
-          cat gcs-export-pipelines/tasks/count.sql | bq query --use_legacy_sql=False --project=$GCP_PROJECT
+          eval "echo \"$(cat gcs-export-pipelines/tasks/count.sql)\"" | bq query --use_legacy_sql=False --project=$GCP_PROJECT
           
 - name: import-skus
   plan:
@@ -140,5 +140,5 @@ jobs:
           gs://$GCS_BUCKET/nd_skus.json 
 
           #count current rows
-          cat gcs-export-pipelines/tasks/count.sql | bq query --use_legacy_sql=False --project=$GCP_PROJECT
+          eval "echo \"$(cat gcs-export-pipelines/tasks/count.sql)\"" | bq query --use_legacy_sql=False --project=$GCP_PROJECT
 
