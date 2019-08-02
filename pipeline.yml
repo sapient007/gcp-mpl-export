@@ -5,6 +5,11 @@ resource_types:
       repository: frodenas/gcs-resource
 
 resources:
+- name: gcs-export-pipelines
+  type: git
+  source:
+    uri: https://github.com/sapient007/gcp-mpl-export.git
+
 - name: cf-mgmt-image
   type: docker-image
   source:
@@ -27,6 +32,7 @@ jobs:
   plan:
   - aggregate:
     - get: cf-mgmt-image
+    - get: gcs-export-pipelines
   - task: download-gcp-price-json
     image: cf-mgmt-image
     config:
@@ -56,6 +62,7 @@ jobs:
   plan:
   - aggregate: 
     - get: gcloud-sdk-image
+    - get: gcs-export-pipelines
     - get: skus
       passed: [download-gcp-price-json]
       trigger: true
@@ -63,6 +70,8 @@ jobs:
     image: gcloud-sdk-image
     config:
       platform: linux
+      inputs:
+      - name: gcs-export-pipelines
       params:
         GCP_KEY: ((GCP_KEY))
         GCP_PROJECT: ((GCP_PROJECT))
@@ -75,11 +84,41 @@ jobs:
           #login to gclouod
           echo $GCP_KEY > service.key
           gcloud auth activate-service-account --project=$GCP_PROJECT --key-file=service.key
-          gcloud info
 
           #bigquery query
-          bq --project_id=$GCP_PROJECT query 'delete from gcp_mpl.all_products where true'
           
-      
+          #drop all rows
+          cat gcs-export-pipelines/tasks/delete.rows.sql | bq query --use_legacy_sql=False --project=$GCP_PROJECT
 
+           #count current rows
+          cat gcs-export-pipelines/tasks/count.sql | bq query --use_legacy_sql=False --project=$GCP_PROJECT
+          
+- name: import-skus
+  plan:
+  - aggregate: 
+    - get: gcloud-sdk-image
+    - get: gcs-export-pipelines
+    - get: skus
+      passed: [truncate-skus-table]
+      trigger: true
+  - task: import-skus
+    image: gcloud-sdk-image
+    config:
+      platform: linux
+      inputs:
+      - name: gcs-export-pipelines
+      - name: skus
+      params:
+        GCP_KEY: ((GCP_KEY))
+        GCP_PROJECT: ((GCP_PROJECT))
+      run:
+        path: bash
+        args:
+        - "-c"
+        - |
+          set -eu
+          #login to gclouod
+          echo $GCP_KEY > service.key
+          gcloud auth activate-service-account --project=$GCP_PROJECT --key-file=service.key
 
+          #bigquery query
