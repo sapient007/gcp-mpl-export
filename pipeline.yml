@@ -61,12 +61,12 @@ jobs:
           #fetch json from url 
           curl $GCP_JSON_URL -o skus.json
           #convert to new line deliminated json
-          cat skus.json | jq -c ".[]" > nd_skus.json
+          cat skus.json | jq -c '.[]' > nd_skus.json
   - put: skus
     params:
       file: "nd_json/nd_skus.json"
 
-- name: truncate-skus-table
+- name: truncate-skus-tables
   plan:
   - aggregate: 
     - get: gcloud-sdk-image
@@ -74,7 +74,7 @@ jobs:
     - get: skus
       passed: [download-gcp-price-json]
       trigger: true
-  - task: delete-exisiting-rows
+  - task: delete-exisiting-tables
     image: gcloud-sdk-image
     config:
       platform: linux
@@ -84,6 +84,7 @@ jobs:
         GCP_KEY: ((GCP_KEY))
         GCP_PROJECT: ((GCP_PROJECT))
         BIGQUERY_TABLE: ((BIGQUERY_TABLE))
+        BIGQUERY_TABLE_UNNESTED: ((BIGQUERY_TABLE_UNNESTED))
       run:
         path: bash
         args:
@@ -98,6 +99,8 @@ jobs:
           #drop all rows
           eval "echo \"$(cat gcs-export-pipelines/tasks/delete.rows.sql)\"" | bq query --use_legacy_sql=False --project=$GCP_PROJECT
 
+          eval "echo \"$(cat gcs-export-pipelines/tasks/delete.rows.unnested.sql)\"" | bq query --use_legacy_sql=False --project=$GCP_PROJECT
+
            #count current rows
           eval "echo \"$(cat gcs-export-pipelines/tasks/count.sql)\"" | bq query --use_legacy_sql=False --project=$GCP_PROJECT
           
@@ -107,7 +110,7 @@ jobs:
     - get: gcloud-sdk-image
     - get: gcs-export-pipelines
     - get: skus
-      passed: [truncate-skus-table]
+      passed: [truncate-skus-tables]
       trigger: true
   - task: import-skus
     image: gcloud-sdk-image
@@ -121,6 +124,7 @@ jobs:
         GCP_PROJECT: ((GCP_PROJECT))
         BIGQUERY_TABLE: ((BIGQUERY_TABLE))
         GCS_BUCKET: ((GCS_BUCKET))
+        BIGQUERY_TABLE_UNNESTED: ((BIGQUERY_TABLE_UNNESTED))
       run:
         path: bash
         args:
@@ -140,6 +144,47 @@ jobs:
           $BIGQUERY_TABLE \
           gs://$GCS_BUCKET/nd_skus.json 
 
+          # #unnest table for export  
+          cat gcs-export-pipelines/tasks/unnest.skus.sql | bq query --destination_table $BIGQUERY_TABLE_UNNESTED --use_legacy_sql=false 
+
           #count current rows
           eval "echo \"$(cat gcs-export-pipelines/tasks/count.sql)\"" | bq query --use_legacy_sql=False --project=$GCP_PROJECT
 
+
+- name: export-skus-csv
+  plan:
+  - aggregate: 
+    - get: gcloud-sdk-image
+    - get: gcs-export-pipelines
+    - get: skus
+      passed: [import-skus]
+      trigger: true
+  - task: export-skus-cs
+    image: gcloud-sdk-image
+    config:
+      platform: linux
+      inputs:
+      - name: gcs-export-pipelines
+      - name: skus
+      params:
+        GCP_KEY: ((GCP_KEY))
+        GCP_PROJECT: ((GCP_PROJECT))
+        BIGQUERY_TABLE: ((BIGQUERY_TABLE))
+        BIGQUERY_TABLE_UNNESTED: ((BIGQUERY_TABLE_UNNESTED))
+        GCS_BUCKET: ((GCS_BUCKET))
+      run:
+        path: bash
+        args:
+        - "-c"
+        - |
+          set -eu
+          #login to gclouod
+          echo $GCP_KEY > service.key
+          gcloud auth activate-service-account --project=$GCP_PROJECT --key-file=service.key
+
+          #bigquery query
+          
+          bq extract \
+          --destination_format CSV \
+          $BIGQUERY_TABLE_UNNESTED  \
+          gs://$GCS_BUCKET/skus.csv
