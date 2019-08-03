@@ -8,6 +8,7 @@ resources:
 - name: midnight-hour
   type: time
   source:
+    interval: 24h
     start: 12:00 AM
     stop: 1:00 AM
 
