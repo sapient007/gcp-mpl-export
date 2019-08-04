@@ -8,9 +8,9 @@ resources:
 - name: midnight-hour
   type: time
   source:
-    interval: 24h
     start: 12:00 AM
     stop: 1:00 AM
+    location: America/New_York
 
 - name: gcs-export-pipelines
   type: git
