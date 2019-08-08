@@ -5,22 +5,32 @@ resource_types:
       repository: frodenas/gcs-resource
 
 resources:
-- name: midnight-hour
-  type: time
-  source:
-    start: 12:00 AM
-    stop: 1:00 AM
-    location: America/New_York
+# - name: midnight-hour
+#   type: time
+#   source:
+#     start: 12:00 AM
+#     stop: 1:00 AM
+#     location: America/New_York
+
+# - name: 5min-timer
+#   type: time
+#   source:
+#     interval: 5m
 
 - name: gcs-export-pipelines
   type: git
   source:
     uri: https://github.com/sapient007/gcp-mpl-export.git
 
-- name: cf-mgmt-image
+# - name: cf-mgmt-image
+#   type: docker-image
+#   source:
+#     repository: pivotalservices/cf-mgmt
+
+- name: rootfs
   type: docker-image
   source:
-    repository: pivotalservices/cf-mgmt
+    repository: pcfnorm/rootfs
 
 - name: gcloud-sdk-image
   type: docker-image
@@ -38,12 +48,12 @@ jobs:
 - name: download-gcp-price-json
   plan:
   - aggregate:
-    - get: midnight-hour
-      trigger: true
-    - get: cf-mgmt-image
+    # - get: midnight-hour
+    #   trigger: true
+    - get: rootfs
     - get: gcs-export-pipelines
   - task: download-gcp-price-json
-    image: cf-mgmt-image
+    image: rootfs
     config:
       platform: linux
       outputs:
@@ -63,6 +73,9 @@ jobs:
           curl $GCP_JSON_URL -o skus.json
           #convert to new line deliminated json
           cat skus.json | jq -c '.[]' > nd_skus.json
+          #diff nd_skus from previous skus
+          echo "skus changed? only show if there's difference"
+          diff -B -b -i -q nd_skus.json ../skus/nd_skus.json || true
   - put: skus
     params:
       file: "nd_json/nd_skus.json"
