@@ -5,12 +5,12 @@ resource_types:
       repository: frodenas/gcs-resource
 
 resources:
-# - name: midnight-hour
-#   type: time
-#   source:
-#     start: 12:00 AM
-#     stop: 1:00 AM
-#     location: America/New_York
+- name: midnight-hour
+  type: time
+  source:
+    start: 12:00 AM
+    stop: 1:00 AM
+    location: America/New_York
 
 # - name: 5min-timer
 #   type: time
@@ -48,8 +48,8 @@ jobs:
 - name: download-gcp-price-json
   plan:
   - aggregate:
-    # - get: midnight-hour
-    #   trigger: true
+    - get: midnight-hour
+      trigger: true
     - get: rootfs
     - get: gcs-export-pipelines
   - task: download-gcp-price-json
