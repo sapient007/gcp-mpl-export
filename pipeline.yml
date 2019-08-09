@@ -5,27 +5,17 @@ resource_types:
       repository: frodenas/gcs-resource
 
 resources:
-- name: midnight-hour
-  type: time
-  source:
-    start: 12:00 AM
-    stop: 1:00 AM
-    location: America/New_York
-
-# - name: 5min-timer
+# - name: midnight-hour
 #   type: time
 #   source:
-#     interval: 5m
+#     start: 1:00 AM
+#     stop: 2:00 AM
+#     location: America/New_York
 
 - name: gcs-export-pipelines
   type: git
   source:
     uri: https://github.com/sapient007/gcp-mpl-export.git
-
-# - name: cf-mgmt-image
-#   type: docker-image
-#   source:
-#     repository: pivotalservices/cf-mgmt
 
 - name: rootfs
   type: docker-image
@@ -44,12 +34,26 @@ resources:
     json_key: ((GCP_KEY))
     versioned_file: nd_skus.json
 
+- name: skus-csv
+  type: gcs-resource
+  source:
+    bucket: ((GCS_BUCKET))
+    json_key: ((GCP_KEY))
+    versioned_file: skus.csv
+
+- name: skus-csv-export
+  type: gcs-resource
+  source:
+    bucket: ((GCS_PUBLIC_BUCKET))
+    json_key: ((GCP_PUBLIC_KEY))
+    versioned_file: gcp_skus.csv
+
 jobs:
 - name: download-gcp-price-json
   plan:
   - aggregate:
-    - get: midnight-hour
-      trigger: true
+    # - get: midnight-hour
+    #   trigger: true
     - get: rootfs
     - get: gcs-export-pipelines
   - task: download-gcp-price-json
@@ -112,9 +116,7 @@ jobs:
           #bigquery query
           #drop all rows
           eval "echo \"$(cat gcs-export-pipelines/tasks/delete.rows.sql)\"" | bq query --use_legacy_sql=False --project=$GCP_PROJECT
-
           eval "echo \"$(cat gcs-export-pipelines/tasks/delete.rows.unnested.sql)\"" | bq query --use_legacy_sql=False --project=$GCP_PROJECT
-
            #count current rows
           eval "echo \"$(cat gcs-export-pipelines/tasks/count.sql)\"" | bq query --use_legacy_sql=False --project=$GCP_PROJECT
           
@@ -197,8 +199,30 @@ jobs:
           gcloud auth activate-service-account --project=$GCP_PROJECT --key-file=service.key
 
           #bigquery query
-          
           bq extract \
           --destination_format CSV \
           $BIGQUERY_TABLE_UNNESTED  \
           gs://$GCS_BUCKET/skus.csv
+
+- name: export-gcp-price-csv-public
+  plan:
+  - aggregate:
+    - get: skus
+      passed: [export-skus-csv]
+      trigger: true    
+    - get: skus-csv
+    - get: rootfs
+  - task: download-gcp-price-json
+    image: rootfs
+    config:
+      platform: linux
+      run:
+        path: bash
+        args:
+        - "-c"
+        - |
+          set -eu
+          echo "transfer container"                   
+  - put: skus-csv-export
+    params:
+      file: "skus-csv/skus.csv"          
