@@ -5,12 +5,12 @@ resource_types:
       repository: frodenas/gcs-resource
 
 resources:
-# - name: midnight-hour
-#   type: time
-#   source:
-#     start: 1:00 AM
-#     stop: 2:00 AM
-#     location: America/New_York
+- name: midnight-hour
+  type: time
+  source:
+    start: 1:00 AM
+    stop: 2:00 AM
+    location: America/New_York
 
 - name: gcs-export-pipelines
   type: git
@@ -52,8 +52,8 @@ jobs:
 - name: download-gcp-price-json
   plan:
   - aggregate:
-    # - get: midnight-hour
-    #   trigger: true
+    - get: midnight-hour
+      trigger: true
     - get: rootfs
     - get: gcs-export-pipelines
   - task: download-gcp-price-json
@@ -216,12 +216,20 @@ jobs:
     image: rootfs
     config:
       platform: linux
+      inputs:
+      - name: skus-csv
+      params:
+        GCP_KEY: ((GCP_PUBLIC_KEY))
+        GCS_BUCKET: ((GCS_PUBLIC_BUCKET))
       run:
         path: bash
         args:
         - "-c"
         - |
           set -eu
+          echo $GCP_KEY > service.key
+          gcloud auth activate-service-account --project="dev-project-218414" --key-file=service.key
+
           echo "transfer container"                   
   - put: skus-csv-export
     params:
