@@ -218,18 +218,12 @@ jobs:
       platform: linux
       inputs:
       - name: skus-csv
-      params:
-        GCP_KEY: ((GCP_PUBLIC_KEY))
-        GCS_BUCKET: ((GCS_PUBLIC_BUCKET))
       run:
         path: bash
         args:
         - "-c"
         - |
           set -eu
-          echo $GCP_KEY > service.key
-          gcloud auth activate-service-account --project="dev-project-218414" --key-file=service.key
-
           echo "transfer container"                   
   - put: skus-csv-export
     params:
