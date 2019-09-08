@@ -4,7 +4,20 @@ resource_types:
     source:
       repository: frodenas/gcs-resource
 
+  - name: hangouts-resource
+    type: docker-image
+    source:
+      repository: cloudinn/concourse-hangouts-resource
+      tag: latest
+
 resources:
+
+- name: hangouts
+  type: hangouts-resource
+  source:
+    webhook_url: ((pipeline_alerts_webhook))
+    post_url: true
+
 - name: midnight-hour
   type: time
   source:
@@ -227,4 +240,7 @@ jobs:
           echo "transfer container"                   
   - put: skus-csv-export
     params:
-      file: "skus-csv/skus.csv"          
+      file: "skus-csv/skus.csv" 
+  - put: hangouts
+    params:
+      message: "'''Successfully exported GCP price to CSV'''"
