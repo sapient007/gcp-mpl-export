@@ -93,6 +93,11 @@ jobs:
           #diff nd_skus from previous skus
           echo "skus changed? only show if there's difference"
           diff -B -b -i -q nd_skus.json ../skus/nd_skus.json || true
+    on_failure:
+      put: hangouts
+      params:
+        message: "Failed to download JSON file"
+
   - put: skus
     params:
       file: "nd_json/nd_skus.json"
@@ -116,6 +121,8 @@ jobs:
         GCP_PROJECT: ((GCP_PROJECT))
         BIGQUERY_TABLE: ((BIGQUERY_TABLE))
         BIGQUERY_TABLE_UNNESTED: ((BIGQUERY_TABLE_UNNESTED))
+        BIGQUERY_TABLE_UNNESTED_GSA: ((BIGQUERY_TABLE_UNNESTED_GSA))
+
       run:
         path: bash
         args:
@@ -130,8 +137,14 @@ jobs:
           #drop all rows
           eval "echo \"$(cat gcs-export-pipelines/tasks/delete.rows.sql)\"" | bq query --use_legacy_sql=False --project=$GCP_PROJECT
           eval "echo \"$(cat gcs-export-pipelines/tasks/delete.rows.unnested.sql)\"" | bq query --use_legacy_sql=False --project=$GCP_PROJECT
+          eval "echo \"$(cat gcs-export-pipelines/tasks/delete.rows.unnested.gsa.sql)\"" | bq query --use_legacy_sql=False --project=$GCP_PROJECT
+
            #count current rows
           eval "echo \"$(cat gcs-export-pipelines/tasks/count.sql)\"" | bq query --use_legacy_sql=False --project=$GCP_PROJECT
+    on_failure:
+      put: hangouts
+      params:
+        message: "Failed to truncate table"
           
 - name: import-skus
   plan:
@@ -154,6 +167,7 @@ jobs:
         BIGQUERY_TABLE: ((BIGQUERY_TABLE))
         GCS_BUCKET: ((GCS_BUCKET))
         BIGQUERY_TABLE_UNNESTED: ((BIGQUERY_TABLE_UNNESTED))
+        BIGQUERY_TABLE_UNNESTED_GSA: ((BIGQUERY_TABLE_UNNESTED_GSA))
       run:
         path: bash
         args:
@@ -173,11 +187,22 @@ jobs:
           $BIGQUERY_TABLE \
           gs://$GCS_BUCKET/nd_skus.json 
 
-          # #unnest table for export  
+          # unnest table for export  
           cat gcs-export-pipelines/tasks/unnest.skus.sql | bq query --destination_table $BIGQUERY_TABLE_UNNESTED --use_legacy_sql=false 
+
+          # create price table for with price seperated out
+          cat gcs-export-pipelines/tasks/gsa_price_export.sql | bq query --destination_table $BIGQUERY_TABLE_UNNESTED_GSA --use_legacy_sql=false --replace
+
+          # create price table for with price seperated out
+          cat gcs-export-pipelines/tasks/remove.duplicate.skus.sql | bq query --destination_table $BIGQUERY_TABLE_UNNESTED_GSA --use_legacy_sql=false --replace
+
 
           #count current rows
           eval "echo \"$(cat gcs-export-pipelines/tasks/count.sql)\"" | bq query --use_legacy_sql=False --project=$GCP_PROJECT
+    on_failure:
+      put: hangouts
+      params:
+        message: "Failed to import skus to bigquery "
 
 
 - name: export-skus-csv
@@ -200,6 +225,7 @@ jobs:
         GCP_PROJECT: ((GCP_PROJECT))
         BIGQUERY_TABLE: ((BIGQUERY_TABLE))
         BIGQUERY_TABLE_UNNESTED: ((BIGQUERY_TABLE_UNNESTED))
+        BIGQUERY_TABLE_UNNESTED_GSA: ((BIGQUERY_TABLE_UNNESTED_GSA))
         GCS_BUCKET: ((GCS_BUCKET))
       run:
         path: bash
@@ -214,8 +240,12 @@ jobs:
           #bigquery query
           bq extract \
           --destination_format CSV \
-          $BIGQUERY_TABLE_UNNESTED  \
+          $BIGQUERY_TABLE_UNNESTED_GSA  \
           gs://$GCS_BUCKET/skus.csv
+    on_failure:
+      put: hangouts
+      params:
+        message: "Failed to export skus csv"
 
 - name: export-gcp-price-csv-public
   plan:
@@ -231,16 +261,19 @@ jobs:
       platform: linux
       inputs:
       - name: skus-csv
+      outputs:
+      - name: export
       run:
         path: bash
         args:
         - "-c"
         - |
           set -eu
-          echo "transfer container"                   
+          echo "transfer container"       
+          cp skus-csv/skus.csv export/gcp_skus.csv 
   - put: skus-csv-export
     params:
-      file: "skus-csv/skus.csv" 
+      file: "export/gcp_skus.csv" 
   - put: hangouts
     params:
       message: "'''Successfully exported GCP price to CSV'''"
