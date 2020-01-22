@@ -135,12 +135,12 @@ jobs:
 
           #bigquery query
           #drop all rows
-          eval "echo \"$(cat gcs-export-pipelines/tasks/delete.rows.sql)\"" | bq query --use_legacy_sql=False --project=$GCP_PROJECT
-          eval "echo \"$(cat gcs-export-pipelines/tasks/delete.rows.unnested.sql)\"" | bq query --use_legacy_sql=False --project=$GCP_PROJECT
-          eval "echo \"$(cat gcs-export-pipelines/tasks/delete.rows.unnested.gsa.sql)\"" | bq query --use_legacy_sql=False --project=$GCP_PROJECT
+          eval "echo \"$(cat gcs-export-pipelines/tasks/delete.rows.sql)\"" | bq query --use_legacy_sql=False --project_id=$GCP_PROJECT
+          eval "echo \"$(cat gcs-export-pipelines/tasks/delete.rows.unnested.sql)\"" | bq query --use_legacy_sql=False --project_id=$GCP_PROJECT
+          eval "echo \"$(cat gcs-export-pipelines/tasks/delete.rows.unnested.gsa.sql)\"" | bq query --use_legacy_sql=False --project_id=$GCP_PROJECT
 
            #count current rows
-          eval "echo \"$(cat gcs-export-pipelines/tasks/count.sql)\"" | bq query --use_legacy_sql=False --project=$GCP_PROJECT
+          eval "echo \"$(cat gcs-export-pipelines/tasks/count.sql)\"" | bq query --use_legacy_sql=False --project_id=$GCP_PROJECT
     on_failure:
       put: hangouts
       params:
@@ -198,7 +198,7 @@ jobs:
 
 
           #count current rows
-          eval "echo \"$(cat gcs-export-pipelines/tasks/count.sql)\"" | bq query --use_legacy_sql=False --project=$GCP_PROJECT
+          eval "echo \"$(cat gcs-export-pipelines/tasks/count.sql)\"" | bq query --use_legacy_sql=False --project_id=$GCP_PROJECT
     on_failure:
       put: hangouts
       params:
@@ -276,4 +276,4 @@ jobs:
       file: "export/gcp_skus.csv" 
   - put: hangouts
     params:
-      message: "'''Successfully exported GCP price to CSV'''"
+      message: "Successfully exported GCP price to CSV https://pricesheet.storage.googleapis.com/gcp_skus.csv"
