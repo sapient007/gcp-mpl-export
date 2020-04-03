@@ -1,0 +1,1 @@
+delete from $BIGQUERY_TABLE_UNNESTED_GSA_CONUS where true
